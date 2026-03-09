@@ -6,13 +6,15 @@ This tool is particularly useful when you only have access to the HTML report fi
 
 ## 🚀 Features
 
-* **HTML Parsing:** Extracts Host IP, Risk Factor, CVSS Scores, Synopsis, Description, and Solution from Nessus HTML reports.
+* **HTML Parsing:** Extracts Host IP, Risk Factor, CVSS Scores, Synopsis, Description, Solution, and more from Nessus HTML reports.
 * **Smart Parsing:**
-    * **Risk Factor Detection:** Identifies risk levels (Critical, High, Medium, etc.) based on Nessus color coding for accuracy.
+    * **Protocol & Port Extraction:** Automatically parses Nessus service tags (e.g., `tcp/2282/ssh`) and splits them into distinct `Layer-4 Protocol`, `Layer-7 Protocol`, and `Port` columns.
+    * **Risk Factor Detection:** Identifies risk levels (Critical, High, Medium, etc.) based on Nessus color coding for 100% accuracy.
     * **Reference Splitting:** Separates CVE IDs and other references (XREF, RHSA, etc.) into distinct columns.
+* **Auto-Rename Output:** Output file parameters are optional. The script can automatically generate a `.csv` file with the exact same base name as your input `.html` file.
 * **Excel Safety:**
     * **Character Limiting:** Automatically splits long "Plugin Outputs" into multiple columns (`Plugin Output 1` to `5`) to avoid Excel's 32,767 character cell limit.
-    * **Format Cleaning:** Sanitizes HTML tags and special characters for clean CSV output.
+    * **Format Cleaning:** Sanitizes HTML tags and special characters for clean CSV output without breaking rows.
 * **Performance:** Optimized regex logic to handle large HTML files without hanging/freezing.
 
 ## 📋 Prerequisites
@@ -22,31 +24,10 @@ This tool is particularly useful when you only have access to the HTML report fi
 
 ## 🛠️ Usage
 
-1.  Download the script (`Convert-Nessus.ps1`).
-2.  Open PowerShell in the directory where the script is located.
-3.  Run the script with the input HTML file and desired output CSV name.
+1. Download the script (`Convert-Nessus.ps1`).
+2. Open PowerShell in the directory where the script is located.
+3. Run the script with the input HTML file. 
 
+**Option 1: Auto-generate output file name (Recommended)**
 ```powershell
-.\Convert-Nessus.ps1 -InputFile "report.html" -OutputFile "report.csv"
-```
-
-Handling Execution Policy Error
-If you encounter an error saying scripts are disabled, run this command before executing the script:
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-## 📝 Output Columns
-* The generated CSV will contain:
-* Host IP
-* Risk Factor (Critical, High, Medium, Low, Info)
-* Vulnerability Name
-* CVSS v3.0 Base & Temporal Scores
-* CVE (List of CVE IDs)
-* XREF (External References)
-* Synopsis & Description
-* Solution
-* Exploitable With
-* Plugin Information
-* Plugin Output (Split into multiple columns if too long)
-
-## ⚠️ Disclaimer
-This tool is provided "as is" without warranty of any kind. It is intended to assist security professionals in managing vulnerability data.
+.\Convert-Nessus.ps1 -InputFile "report.html"
