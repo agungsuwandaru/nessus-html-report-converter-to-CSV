@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Konversi Nessus HTML ke CSV (Rev 11: Split Plugin Output hingga 5 Kolom).
+    Konversi Nessus HTML ke CSV (Rev 12: Tambah Protocol L4/L7 & Port).
 #>
 
 param (
@@ -8,7 +8,7 @@ param (
     [string]$InputFile,
 
     [Parameter(Mandatory=$false)]
-    [string]$OutputFile = "Hasil_Scan_Rev11_MultiSplit.csv"
+    [string]$OutputFile = "Hasil_Scan_Rev12_PortProto.csv"
 )
 
 # --- FUNGSI PEMBERSIH HTML & PENGAMAN CSV ---
@@ -20,7 +20,7 @@ function Clean-HtmlString {
     $Text = $Text -replace "(?i)</p>", "`n"
     $Text = $Text -replace "<[^>]+>", ""
     $Text = [System.Web.HttpUtility]::HtmlDecode($Text)
-    $Text = $Text.Replace('"', "'") # Ganti kutip ganda jadi kutip satu (PENTING)
+    $Text = $Text.Replace('"', "'") 
     $Text = $Text -replace "[ \t]+", " "
     $Text = $Text -replace "(\r?\n\s*)+", "`n"
     
@@ -72,7 +72,7 @@ if ($content -match '(?s)>IP:</td>\s*<td[^>]*>(.*?)</td>') {
 Write-Host "Host IP: $hostIp" -ForegroundColor Green
 
 # 3. PROSES DATA
-Write-Host "Memproses data (Split Output hingga 5 Kolom)..." -ForegroundColor Yellow
+Write-Host "Memproses data (Extract Port & Protocol)..." -ForegroundColor Yellow
 
 $chunks = $content -split '<div xmlns="" id="'
 $vulnData = @{}
@@ -117,10 +117,37 @@ foreach ($chunk in $chunks) {
             $seeAlso = ""; $rawOutput = ""; 
             $exploit = ""; $pluginInfo = ""
             
+            # Variabel Protocol & Port Default
+            $l4Proto = "-"
+            $l7Proto = "-"
+            $portNum = "-"
+
             $cveList = @()
             $xrefList = @()
 
-            # Ekstraksi Data Standar
+            # --- EKSTRAKSI PROTOCOL & PORT ---
+            # Pola: <h2>tcp/2282/ssh</h2> atau <h2>tcp/0</h2>
+            if ($body -match '(?i)<h2>\s*(tcp|udp)/(\d+)(?:/([^<]+))?\s*</h2>') {
+                $rawL4 = $matches[1].ToUpper()
+                $rawPort = $matches[2]
+                $rawL7 = $matches[3] # Bisa kosong/null
+
+                $l4Proto = $rawL4
+                
+                if ($rawPort -eq "0") {
+                    $portNum = "-"
+                    $l7Proto = "-"
+                } else {
+                    $portNum = $rawPort
+                    if ([string]::IsNullOrWhiteSpace($rawL7)) {
+                        $l7Proto = "-"
+                    } else {
+                        $l7Proto = $rawL7.ToUpper()
+                    }
+                }
+            }
+
+            # --- EKSTRAKSI DATA LAINNYA ---
             if ($body -match '(?s)>Synopsis<div.*?<div style[^>]*>(.*?)<div class="clear">') {
                 $synopsis = Clean-HtmlString $matches[1]
             }
@@ -159,26 +186,22 @@ foreach ($chunk in $chunks) {
                 }
             }
             
-            # --- PENGAMBILAN & PEMISAHAN PLUGIN OUTPUT (HINGGA 5 KOLOM) ---
+            # --- SPLIT PLUGIN OUTPUT ---
             if ($body -match '(?s)>Plugin Output<.*?<div[^>]*background: #eee[^>]*>(.*?)<div class="clear">') {
                 $rawOutput = Clean-HtmlString $matches[1]
             }
 
-            # Limit Excel per sel (aman di 32.000)
             $limit = 32000
-            
-            # Array penampung untuk 5 kolom
             $outs = @("", "", "", "", "") 
             $currentText = $rawOutput
 
-            # Loop untuk memecah teks menjadi 5 bagian
             for ($i = 0; $i -lt 5; $i++) {
                 if ($currentText.Length -gt $limit) {
                     $outs[$i] = $currentText.Substring(0, $limit)
                     $currentText = $currentText.Substring($limit)
                 } else {
                     $outs[$i] = $currentText
-                    $currentText = "" # Kosongkan sisa karena sudah habis
+                    $currentText = ""
                     break
                 }
             }
@@ -188,6 +211,9 @@ foreach ($chunk in $chunks) {
                 'Host IP'                = $hostIp
                 'Risk Factor'            = $item.Risk
                 'Vulnerability'          = $item.Name
+                'Layer-4 Protocol'       = $l4Proto
+                'Layer-7 Protocol'       = $l7Proto
+                'Port'                   = $portNum
                 'CVSS v3.0 Base Score'   = $cvssBase
                 'CVSS v3.0 Temp Score'   = $cvssTemp
                 'CVE'                    = ($cveList -join "`n")
